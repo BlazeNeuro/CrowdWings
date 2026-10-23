@@ -36,9 +36,9 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
 
   return (
     <Link href={`/campaigns/${campaign.id}`} className="block group">
-      <Card className="h-full flex flex-col overflow-hidden border-border bg-card text-card-foreground hover:shadow-md transition-all duration-200">
+      <Card className="h-full flex flex-col overflow-hidden border-border bg-card text-card-foreground hover:shadow-md transition-all duration-200 !pt-0 [padding-top:0!important] [padding-block-start:0!important]">
         {/* Banner Media */}
-        <div className="relative w-full h-48 bg-muted overflow-hidden">
+        <div data-slot="card-media" className="card-media card-banner relative w-full h-48 bg-muted overflow-hidden rounded-t-xl -mt-px">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={campaign.bannerUrl}

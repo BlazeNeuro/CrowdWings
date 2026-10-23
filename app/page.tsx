@@ -66,7 +66,7 @@ function HomeContent() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 max-w-md mx-auto mb-16">
-          <Link href="/campaigns" className="w-full sm:w-auto">
+          <Link href="/dashboard" className="w-full sm:w-auto">
             <Button variant="default" size="lg" className="w-full sm:w-auto gap-2">
               <TrendingUp className="size-4" />
               Explore Campaigns
@@ -228,7 +228,7 @@ function HomeContent() {
             </h2>
           </div>
           <Link
-            href="/campaigns"
+            href="/dashboard"
             className="text-xs font-semibold text-muted-foreground hover:text-foreground flex items-center gap-1.5"
           >
             Explore all {campaigns.length} campaigns <ArrowRight className="size-4 text-primary" />

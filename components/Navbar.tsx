@@ -10,7 +10,6 @@ import { ModeToggle } from "@/components/mode-toggle";
 import {
   Sparkles,
   Rocket,
-  Compass,
   LayoutDashboard,
   Wallet,
   LogOut,
@@ -47,12 +46,6 @@ export function Navbar() {
             </Link>
 
             <nav className="hidden md:flex items-center gap-1">
-              <Link href="/campaigns">
-                <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground">
-                  <Compass className="size-4" />
-                  Explore
-                </Button>
-              </Link>
               <Link href="/dashboard">
                 <Button variant="ghost" size="sm" className="gap-1.5 text-muted-foreground hover:text-foreground">
                   <LayoutDashboard className="size-4" />
@@ -131,14 +124,6 @@ export function Navbar() {
       {/* Mobile menu dropdown */}
       {isMobileMenuOpen && (
         <div className="md:hidden border-t border-border bg-background px-4 pt-3 pb-5 space-y-2">
-          <Link
-            href="/campaigns"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-foreground rounded-lg hover:bg-muted"
-          >
-            <Compass className="size-4" />
-            Explore Campaigns
-          </Link>
           <Link
             href="/dashboard"
             onClick={() => setIsMobileMenuOpen(false)}

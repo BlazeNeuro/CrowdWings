@@ -13,7 +13,7 @@ import {
 import { useEthPrice } from "@/lib/web3/hooks";
 import { TrendingUp, ShieldCheck, Coins, Users } from "lucide-react";
 
-export function SectionCards() {
+export function SectionCards({ className }: { className?: string } = {}) {
   const ethPrice = useEthPrice();
   const [campaignCount, setCampaignCount] = useState<number>(0);
   const [totalEthRaised, setTotalEthRaised] = useState<number>(0);
@@ -50,7 +50,7 @@ export function SectionCards() {
   });
 
   return (
-    <div className="grid grid-cols-1 gap-4 px-4 lg:px-6 md:grid-cols-2 lg:grid-cols-4">
+    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 w-full ${className || ""}`}>
       {/* Total Raised */}
       <Card>
         <CardHeader>

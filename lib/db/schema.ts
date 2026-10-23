@@ -9,7 +9,7 @@ export const user = pgTable("user", {
   image: text("image"),
   walletAddress: text("wallet_address"),
   bio: text("bio"),
-  role: text("role").default("user"),
+  role: text("role").default("investor"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
 });

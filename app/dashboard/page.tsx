@@ -10,47 +10,84 @@ import { RealCampaign } from "@/lib/db";
 import { AppSidebar } from "@/components/app-sidebar";
 import { SectionCards } from "@/components/section-cards";
 import { SiteHeader } from "@/components/site-header";
+import { WalletConnectDialog } from "@/components/wallet-connect-dialog";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
-  HeartHandshake,
-  Rocket,
+  TrendingUp,
+  Building2,
   ShieldCheck,
   Coins,
   RefreshCw,
   Plus,
   ArrowRight,
   CheckCircle2,
+  Wallet,
+  Compass,
+  Sparkles,
+  Users,
+  Layers,
+  Search,
 } from "lucide-react";
+
+const CATEGORIES = ["All", "Reforestation", "Agroforestry", "Planet Rescue", "Biodiversity", "Clean Cities"];
 
 function DashboardContent() {
   const searchParams = useSearchParams();
   const initialRoleParam = searchParams.get("role");
-  const { address } = useAccount();
+  const { address, isConnected } = useAccount();
   const { data: session } = useSession();
   const ethPrice = useEthPrice();
   const { claim: claimRefundTx, isPending: isClaimingRefund } = useClaimRefund();
 
-  // Role: "donor" or "creator"
-  const [role, setRole] = useState<"donor" | "creator">("donor");
+  // Role: "investor" or "organization" (supports legacy "donor" and "creator")
+  const [role, setRole] = useState<"investor" | "organization">("investor");
   const [campaigns, setCampaigns] = useState<RealCampaign[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
   const [refundStatus, setRefundStatus] = useState<Record<string, string>>({});
+  const [walletDialogOpen, setWalletDialogOpen] = useState(false);
 
+  // Initialize role from URL query, session, or localStorage
   useEffect(() => {
-    if (initialRoleParam === "creator" || initialRoleParam === "donor") {
-      setRole(initialRoleParam);
+    const userRole = (session?.user as Record<string, any> | undefined)?.role;
+    if (initialRoleParam === "organization" || initialRoleParam === "creator") {
+      setRole("organization");
+    } else if (initialRoleParam === "investor" || initialRoleParam === "donor") {
+      setRole("investor");
+    } else if (userRole === "organization" || userRole === "investor") {
+      setRole(userRole as "investor" | "organization");
     } else if (typeof window !== "undefined") {
       const savedRole = localStorage.getItem("crowdwings_user_role");
-      if (savedRole === "creator" || savedRole === "donor") {
-        setRole(savedRole);
+      if (savedRole === "organization" || savedRole === "creator") {
+        setRole("organization");
+      } else if (savedRole === "investor" || savedRole === "donor") {
+        setRole("investor");
       }
     }
-  }, [initialRoleParam]);
+  }, [initialRoleParam, session]);
 
+  // Check if wallet is connected on landing, if not open shadcn wallet dialog
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!isConnected) {
+        if (typeof window !== "undefined") {
+          const dismissedInSession = sessionStorage.getItem("crowdwings_wallet_dialog_dismissed");
+          if (!dismissedInSession) {
+            setWalletDialogOpen(true);
+          }
+        }
+      }
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [isConnected]);
+
+  // Load live running campaigns from Neon DB
   useEffect(() => {
     async function loadRealCampaigns() {
       setLoading(true);
@@ -61,7 +98,7 @@ function DashboardContent() {
           setCampaigns(data.campaigns || []);
         }
       } catch (err) {
-        console.error("Failed to load real campaigns:", err);
+        console.error("Failed to load real campaigns from Neon DB:", err);
       } finally {
         setLoading(false);
       }
@@ -71,7 +108,7 @@ function DashboardContent() {
 
   async function handleClaimRefund(campaignId: string, onChainId: number | null) {
     if (!address) {
-      alert("Connect your MetaMask wallet to claim refund!");
+      setWalletDialogOpen(true);
       return;
     }
     try {
@@ -88,7 +125,20 @@ function DashboardContent() {
     }
   }
 
-  // Filter real campaigns created by this user's wallet
+  // Filter running campaigns
+  const activeRunningCampaigns = campaigns.filter((c) => {
+    const matchesCategory =
+      selectedCategory === "All" || c.category.toLowerCase() === selectedCategory.toLowerCase();
+    const query = searchQuery.trim().toLowerCase();
+    const matchesSearch =
+      !query ||
+      c.title.toLowerCase().includes(query) ||
+      c.summary.toLowerCase().includes(query) ||
+      c.category.toLowerCase().includes(query);
+    return matchesCategory && matchesSearch;
+  });
+
+  // Filter campaigns created by current user's wallet
   const myCreatedCampaigns = campaigns.filter(
     (c) => address && c.creatorWallet?.toLowerCase() === address.toLowerCase()
   );
@@ -105,98 +155,46 @@ function DashboardContent() {
       <AppSidebar variant="inset" />
       <SidebarInset>
         <SiteHeader />
+        
+        {/* Wallet Connection Dialog */}
+        <WalletConnectDialog
+          open={walletDialogOpen}
+          onOpenChange={setWalletDialogOpen}
+          role={role}
+        />
+
         <div className="flex flex-1 flex-col p-4 md:p-6 space-y-6">
-          {/* Role Customization Banner & Switcher */}
-          <Card className="p-4 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <div className="flex items-center gap-2">
-                <Badge variant={role === "donor" ? "default" : "secondary"}>
-                  {role === "donor" ? (
-                    <>
-                      <HeartHandshake className="size-3 mr-1" /> Donor / Backer Dashboard
-                    </>
-                  ) : (
-                    <>
-                      <Rocket className="size-3 mr-1" /> Project Creator Dashboard
-                    </>
-                  )}
-                </Badge>
-                {session && (
-                  <span className="text-xs text-muted-foreground">
-                    Signed in as <strong className="text-foreground">{session.user.name}</strong>
-                  </span>
-                )}
-              </div>
-              <h2 className="text-xl font-bold tracking-tight text-foreground">
-                {role === "donor"
-                  ? "Your Web3 Backing Portfolio & Governance"
-                  : "Your Campaign Launchpad & Escrow Controls"}
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                {role === "donor"
-                  ? "Track your non-custodial pledges, cast votes on milestone unlocks, and claim trustless refunds."
-                  : "Monitor funding progress, submit milestone proof-of-work, and unlock capital."}
-              </p>
-            </div>
-
-            {/* Interactive Role Switcher Toggle */}
-            <div className="flex items-center gap-1 p-1 bg-muted rounded-lg border border-border self-stretch sm:self-auto">
-              <Button
-                variant={role === "donor" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => {
-                  setRole("donor");
-                  localStorage.setItem("crowdwings_user_role", "donor");
-                }}
-                className="flex-1 sm:flex-initial text-xs h-8 gap-1.5"
-              >
-                <HeartHandshake className="size-3.5" /> Donor View
-              </Button>
-              <Button
-                variant={role === "creator" ? "default" : "ghost"}
-                size="sm"
-                onClick={() => {
-                  setRole("creator");
-                  localStorage.setItem("crowdwings_user_role", "creator");
-                }}
-                className="flex-1 sm:flex-initial text-xs h-8 gap-1.5"
-              >
-                <Rocket className="size-3.5" /> Creator View
-              </Button>
-            </div>
-          </Card>
-
-          {/* Metric Cards (Real DB & Web3 Data) */}
+          {/* Metric Cards (Synchronized with Neon DB) */}
           <SectionCards />
 
-          {/* ROLE CUSTOMIZED VIEW 1: CREATOR (The person who needs money) */}
-          {role === "creator" && (
+          {/* VIEW FOR ORGANIZATIONS */}
+          {role === "organization" && (
             <div className="space-y-6">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h3 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
-                    <Rocket className="size-5 text-primary" />
-                    My Created Campaigns
+                    <Building2 className="size-5 text-primary" />
+                    Your Organization&apos;s Campaigns
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Real campaigns registered on-chain and in Neon DB with your connected wallet
+                    Campaigns created by your connected wallet ({address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "Wallet not connected"})
                   </p>
                 </div>
                 <Link href="/campaigns/create">
                   <Button variant="default" size="sm" className="gap-1.5">
-                    <Plus className="size-3.5" /> Start New Campaign
+                    <Plus className="size-3.5" /> Launch New Campaign
                   </Button>
                 </Link>
               </div>
 
               {loading ? (
-                <div className="p-8 text-center text-xs text-muted-foreground">
-                  Loading real database records...
+                <div className="p-12 text-center text-xs text-muted-foreground rounded-xl border border-border bg-card">
+                  Loading campaigns from Neon DB...
                 </div>
               ) : myCreatedCampaigns.length > 0 ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {myCreatedCampaigns.map((camp) => (
-                    <Card key={camp.id} className="p-5 space-y-4">
+                    <Card key={camp.id} className="p-5 space-y-4 border-border bg-card">
                       <div className="flex items-start justify-between">
                         <div>
                           <Badge variant="outline" className="mb-1 text-[10px]">{camp.category}</Badge>
@@ -208,14 +206,14 @@ function DashboardContent() {
                         </Badge>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2 text-center text-xs py-2 bg-muted/50 rounded-lg border border-border">
+                      <div className="grid grid-cols-3 gap-2 text-center text-xs py-2.5 bg-muted/50 rounded-xl border border-border">
                         <div>
                           <div className="font-bold text-foreground">{camp.raisedEth} ETH</div>
                           <div className="text-[10px] text-muted-foreground">Raised</div>
                         </div>
                         <div>
                           <div className="font-bold text-foreground">{camp.targetEth} ETH</div>
-                          <div className="text-[10px] text-muted-foreground">Goal</div>
+                          <div className="text-[10px] text-muted-foreground">Target</div>
                         </div>
                         <div>
                           <div className="font-bold text-foreground">{camp.backersCount}</div>
@@ -223,134 +221,41 @@ function DashboardContent() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 pt-2">
-                        <Link href={`/campaigns/${camp.id}`} className="flex-1">
-                          <Button variant="default" size="sm" className="w-full">
-                            Manage & Request Milestone Payout
-                          </Button>
-                        </Link>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
-              ) : (
-                <Card className="p-10 text-center space-y-3">
-                  <Rocket className="size-8 text-muted-foreground mx-auto" />
-                  <div className="text-sm font-bold text-foreground">No campaigns created under this wallet</div>
-                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    {address
-                      ? `Your connected wallet (${address.slice(0, 6)}...${address.slice(-4)}) has not launched any projects yet.`
-                      : "Connect your MetaMask wallet to author and deploy your first on-chain crowdfunding escrow."}
-                  </p>
-                  <div>
-                    <Link href="/campaigns/create">
-                      <Button variant="default" size="sm" className="gap-1.5">
-                        <Plus className="size-3.5" /> Launch First Project
-                      </Button>
-                    </Link>
-                  </div>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {/* ROLE CUSTOMIZED VIEW 2: DONOR / BACKER */}
-          {role === "donor" && (
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
-                    <HeartHandshake className="size-5 text-primary" />
-                    Campaigns Available for Backing & Governance
-                  </h3>
-                  <p className="text-xs text-muted-foreground">
-                    Real campaigns from Neon DB. Pledge ETH and exercise your backer voting rights.
-                  </p>
-                </div>
-                <Link href="/campaigns">
-                  <Button variant="outline" size="sm" className="gap-1.5">
-                    Explore All <ArrowRight className="size-3.5" />
-                  </Button>
-                </Link>
-              </div>
-
-              {loading ? (
-                <div className="p-8 text-center text-xs text-muted-foreground">
-                  Loading real database records...
-                </div>
-              ) : campaigns.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {campaigns.map((camp) => (
-                    <Card key={camp.id} className="p-5 space-y-4">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <Badge variant="outline" className="mb-1 text-[10px]">{camp.category}</Badge>
-                          <h4 className="text-base font-bold text-foreground line-clamp-1">{camp.title}</h4>
-                        </div>
-                        <Badge variant={camp.status === "SUCCEEDED" ? "default" : "secondary"}>
-                          {camp.status}
-                        </Badge>
-                      </div>
-
-                      <p className="text-xs text-muted-foreground line-clamp-2">{camp.summary}</p>
-
-                      <div className="space-y-1">
-                        <div className="flex justify-between text-xs">
-                          <span className="font-bold text-foreground">{camp.raisedEth} ETH</span>
-                          <span className="text-muted-foreground">of {camp.targetEth} ETH</span>
-                        </div>
-                        <Progress
-                          value={Math.min(
-                            100,
-                            Math.round(
-                              (parseFloat(camp.raisedEth || "0") /
-                                parseFloat(camp.targetEth || "1")) *
-                                100
-                            )
-                          )}
-                          className="h-2"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-2">
+                      <div className="flex items-center gap-3 pt-1">
                         <Link href={`/campaigns/${camp.id}`} className="flex-1">
                           <Button variant="default" size="sm" className="w-full text-xs">
-                            Pledge & Vote
+                            Manage Milestone Escrow & Proofs
                           </Button>
                         </Link>
-                        {camp.status === "FAILED" && (
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            disabled={isClaimingRefund}
-                            onClick={() => handleClaimRefund(camp.id, camp.onChainId)}
-                            className="text-xs"
-                          >
-                            Claim Refund
-                          </Button>
-                        )}
                       </div>
-
-                      {refundStatus[camp.id] && (
-                        <div className="p-2.5 rounded-lg bg-muted border border-border text-foreground text-xs flex items-center gap-1.5">
-                          <CheckCircle2 className="size-4 text-primary shrink-0" />
-                          {refundStatus[camp.id]}
-                        </div>
-                      )}
                     </Card>
                   ))}
                 </div>
               ) : (
-                <Card className="p-10 text-center space-y-3">
-                  <Coins className="size-8 text-muted-foreground mx-auto" />
-                  <div className="text-sm font-bold text-foreground">No campaigns in database yet</div>
-                  <p className="text-xs text-muted-foreground max-w-sm mx-auto">
-                    Be the pioneer who launches the first project on the protocol!
+                <Card className="p-8 sm:p-10 text-center space-y-3.5 border-dashed border-border bg-card">
+                  <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mx-auto">
+                    <Building2 className="size-6" />
+                  </div>
+                  <div className="text-base font-bold text-foreground">No campaigns launched yet</div>
+                  <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                    {address
+                      ? "You haven't launched a project under your connected address. Create your milestone escrow to start raising funds."
+                      : "Connect your MetaMask wallet or deploy your first milestone-driven crowdfunding campaign to get funded."}
                   </p>
-                  <div>
+                  <div className="pt-2 flex justify-center gap-3">
+                    {!isConnected && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setWalletDialogOpen(true)}
+                        className="gap-1.5"
+                      >
+                        <Wallet className="size-3.5" /> Connect Wallet
+                      </Button>
+                    )}
                     <Link href="/campaigns/create">
                       <Button variant="default" size="sm" className="gap-1.5">
-                        <Plus className="size-3.5" /> Launch First Campaign
+                        <Plus className="size-3.5" /> Start New Campaign
                       </Button>
                     </Link>
                   </div>
@@ -358,6 +263,171 @@ function DashboardContent() {
               )}
             </div>
           )}
+
+          {/* RUNNING CAMPAIGNS SECTION (SHOWN PROMINENTLY FOR INVESTORS & ORGANIZATIONS) */}
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <div>
+                <h3 className="text-lg font-bold tracking-tight text-foreground flex items-center gap-2">
+                  <Sparkles className="size-5 text-primary" />
+                  Running Campaigns on Protocol
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Active plant growing, ecological restoration, and planetary conservation campaigns loaded from Neon DB.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-1">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-2.5 size-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search campaigns by title, keywords, or species..."
+                    className="pl-9 h-9 text-xs rounded-xl bg-card border-border"
+                  />
+                </div>
+
+                {/* Category Filter Chips */}
+                <div className="flex flex-wrap items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+                  {CATEGORIES.map((cat) => (
+                    <Button
+                      key={cat}
+                      variant={selectedCategory === cat ? "default" : "outline"}
+                      size="xs"
+                      onClick={() => setSelectedCategory(cat)}
+                      className="h-8 text-xs rounded-lg font-medium"
+                    >
+                      {cat}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {loading ? (
+              <div className="p-12 text-center text-xs text-muted-foreground rounded-xl border border-border bg-card">
+                Fetching running campaigns from Neon DB...
+              </div>
+            ) : activeRunningCampaigns.length > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {activeRunningCampaigns.map((camp) => {
+                  const raised = parseFloat(camp.raisedEth || "0");
+                  const target = parseFloat(camp.targetEth || "1");
+                  const percent = Math.min(100, Math.round((raised / target) * 100));
+
+                  return (
+                    <Card
+                      key={camp.id}
+                      className="group flex flex-col justify-between overflow-hidden border-border bg-card hover:border-primary/40 transition-all shadow-xs !pt-0 [padding-top:0!important] [padding-block-start:0!important]"
+                    >
+                      {/* Banner Image */}
+                      {camp.bannerUrl && (
+                        <div data-slot="card-media" className="card-media card-banner relative aspect-video w-full overflow-hidden bg-muted rounded-t-xl -mt-px">
+                          <img
+                            src={camp.bannerUrl}
+                            alt={camp.title}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                          />
+                          <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                            <Badge variant="secondary" className="bg-background/90 backdrop-blur-md text-[10px] font-bold">
+                              {camp.category}
+                            </Badge>
+                          </div>
+                          <div className="absolute top-3 right-3">
+                            <Badge
+                              variant={camp.status === "ACTIVE" ? "default" : "secondary"}
+                              className="text-[10px] font-bold backdrop-blur-md"
+                            >
+                              {camp.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      )}
+
+                      <div className="p-5 flex-1 flex flex-col justify-between space-y-4">
+                        <div>
+                          <h4 className="text-base font-bold text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+                            {camp.title}
+                          </h4>
+                          <p className="text-xs text-muted-foreground line-clamp-2 mt-1.5 leading-relaxed">
+                            {camp.summary}
+                          </p>
+                        </div>
+
+                        {/* Funding Progress Bar */}
+                        <div className="space-y-1.5">
+                          <div className="flex justify-between text-xs">
+                            <span className="font-bold text-foreground">{camp.raisedEth} ETH raised</span>
+                            <span className="text-muted-foreground font-mono">{percent}% of {camp.targetEth} ETH</span>
+                          </div>
+                          <Progress value={percent} className="h-2" />
+                        </div>
+
+                        {/* Backer and Milestone Stats */}
+                        <div className="grid grid-cols-2 gap-2 text-center text-xs py-2 bg-muted/40 rounded-lg border border-border/60">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <Users className="size-3 text-muted-foreground" />
+                            <span className="font-bold text-foreground">{camp.backersCount}</span>
+                            <span className="text-[11px] text-muted-foreground">backers</span>
+                          </div>
+                          <div className="flex items-center justify-center gap-1.5">
+                            <Layers className="size-3 text-muted-foreground" />
+                            <span className="font-bold text-foreground">{camp.milestoneCount}</span>
+                            <span className="text-[11px] text-muted-foreground">milestones</span>
+                          </div>
+                        </div>
+
+                        {/* CTAs */}
+                        <div className="flex items-center gap-2 pt-1">
+                          <Link href={`/campaigns/${camp.id}`} className="flex-1">
+                            <Button variant="default" size="sm" className="w-full text-xs font-medium gap-1.5">
+                              {role === "investor" ? "Invest & Vote" : "View Campaign"}
+                              <ArrowRight className="size-3.5" />
+                            </Button>
+                          </Link>
+                          {camp.status === "FAILED" && (
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={isClaimingRefund}
+                              onClick={() => handleClaimRefund(camp.id, camp.onChainId)}
+                              className="text-xs"
+                            >
+                              Claim Refund
+                            </Button>
+                          )}
+                        </div>
+
+                        {refundStatus[camp.id] && (
+                          <div className="p-2.5 rounded-lg bg-muted border border-border text-foreground text-xs flex items-center gap-1.5">
+                            <CheckCircle2 className="size-4 text-primary shrink-0" />
+                            {refundStatus[camp.id]}
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card className="p-10 text-center space-y-3 border-dashed border-border bg-card">
+                <Coins className="size-8 text-muted-foreground mx-auto" />
+                <div className="text-sm font-bold text-foreground">No active campaigns in this category</div>
+                <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+                  Try selecting &quot;All&quot; or be the first to launch a new project in this category!
+                </p>
+                <div>
+                  <Link href="/campaigns/create">
+                    <Button variant="default" size="sm" className="gap-1.5">
+                      <Plus className="size-3.5" /> Launch Campaign
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            )}
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>

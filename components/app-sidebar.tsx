@@ -3,7 +3,6 @@
 import * as React from "react";
 import Link from "next/link";
 import { NavMain } from "@/components/nav-main";
-import { NavSecondary } from "@/components/nav-secondary";
 import { NavUser } from "@/components/nav-user";
 import { useSession } from "@/lib/auth/auth-client";
 import {
@@ -12,47 +11,24 @@ import {
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import {
   LayoutDashboardIcon,
-  CompassIcon,
-  RocketIcon,
-  ShieldCheckIcon,
-  CoinsIcon,
-  Settings2Icon,
-  SparklesIcon,
+  PlusCircleIcon,
+  SproutIcon,
 } from "lucide-react";
 
 const navMainItems = [
   {
-    title: "Dashboard Overview",
+    title: "Dashboard",
     url: "/dashboard",
-    icon: <LayoutDashboardIcon />,
+    icon: <LayoutDashboardIcon className="size-4 text-primary" />,
   },
   {
-    title: "Explore Campaigns",
-    url: "/campaigns",
-    icon: <CompassIcon />,
-  },
-  {
-    title: "Launch Project",
+    title: "Start a Campaign",
     url: "/campaigns/create",
-    icon: <RocketIcon />,
-  },
-  {
-    title: "Milestone Escrow",
-    url: "/dashboard",
-    icon: <ShieldCheckIcon />,
-  },
-];
-
-const navSecondaryItems = [
-  {
-    title: "Settings & Wallet",
-    url: "/dashboard",
-    icon: <Settings2Icon />,
+    icon: <PlusCircleIcon className="size-4" />,
   },
 ];
 
@@ -62,7 +38,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const user = {
     name: session?.user?.name || "Web3 Pioneer",
     email: session?.user?.email || "Connected via MetaMask",
-    avatar: session?.user?.image || "https://api.dicebear.com/7.x/identicon/svg?seed=user",
+    avatar: session?.user?.image || `https://api.dicebear.com/7.x/identicon/svg?seed=${session?.user?.email || "user"}`,
+    role: (session?.user as Record<string, any> | undefined)?.role || "investor",
   };
 
   return (
@@ -70,13 +47,21 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
-            <Link href="/" className="flex items-center gap-2 px-2 py-2 font-bold text-sm text-foreground hover:text-primary transition">
-              <div className="flex size-7 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <SparklesIcon className="size-4" />
+            <Link
+              href="/"
+              className="flex items-center gap-2.5 px-3 py-2.5 font-bold text-sm text-foreground hover:text-primary transition"
+            >
+              <div className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-xs">
+                <SproutIcon className="size-4" />
               </div>
-              <span className="text-base font-bold tracking-tight">
-                CrowdWings
-              </span>
+              <div className="flex flex-col">
+                <span className="text-base font-extrabold tracking-tight leading-none">
+                  CrowdWings
+                </span>
+                <span className="text-[10px] text-muted-foreground font-normal mt-0.5">
+                  Decentralized Protocol
+                </span>
+              </div>
             </Link>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -84,7 +69,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarContent>
         <NavMain items={navMainItems} />
-        <NavSecondary items={navSecondaryItems} className="mt-auto" />
       </SidebarContent>
 
       <SidebarFooter>

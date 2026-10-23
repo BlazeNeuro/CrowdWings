@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAccount } from "wagmi";
+import { useSession } from "@/lib/auth/auth-client";
 import { useCreateCampaignContract, useEthPrice } from "@/lib/web3/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,6 +29,7 @@ interface MilestoneInput {
 export default function CreateCampaignPage() {
   const router = useRouter();
   const { address } = useAccount();
+  const { data: session } = useSession();
   const ethPrice = useEthPrice();
   const { createOnChainCampaign, isPending, isConfirming } = useCreateCampaignContract();
 
@@ -120,7 +122,8 @@ export default function CreateCampaignPage() {
           durationDays,
           fundingType,
           creatorWallet: address,
-          creatorName: `${address.slice(0, 6)}...${address.slice(-4)}`,
+          creatorName: session?.user?.name || `${address.slice(0, 6)}...${address.slice(-4)}`,
+          creatorId: session?.user?.id || null,
           onChainId,
           milestones,
         }),
@@ -201,7 +204,7 @@ export default function CreateCampaignPage() {
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g., HeliosMesh: Decentralized Solar Micro-Grids"
+              placeholder="e.g., CleanRiver AI: Autonomous Waste Barriers for Urban Waterways"
             />
           </div>
 
@@ -213,13 +216,17 @@ export default function CreateCampaignPage() {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full h-11 px-3.5 py-2 bg-card border border-border rounded-xl text-foreground text-sm focus:outline-none focus:border-primary"
+                className="w-full h-11 px-3.5 py-2 bg-card border border-border rounded-lg text-foreground text-sm focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="Tech">Tech & AI</option>
-                <option value="Climate">Climate & Energy</option>
-                <option value="Gaming">Gaming & Metaverse</option>
-                <option value="DeFi">DeFi & Infrastructure</option>
-                <option value="Community">Community & Social</option>
+                <option value="Agriculture">Agriculture & Smart Farming</option>
+                <option value="Planet Rescue">Planet Rescue & Wildlife Conservation</option>
+                <option value="Clean Cities">Clean Cities & Urban Waste Cleanup</option>
+                <option value="Ocean & Water">Ocean & River Plastic Removal</option>
+                <option value="Climate">Climate, Carbon & Renewable Energy</option>
+                <option value="Reforestation">Reforestation & Soil Regeneration</option>
+                <option value="Tech">Tech, Robotics & AI</option>
+                <option value="DeFi">DeFi & Web3 Infrastructure</option>
+                <option value="Community">Community & Public Goods</option>
               </select>
             </div>
 

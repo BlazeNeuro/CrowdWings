@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       fundingType,
       creatorWallet,
       creatorName,
+      creatorId,
       onChainId,
       milestones,
     } = body;
@@ -65,6 +66,7 @@ export async function POST(request: NextRequest) {
       creatorWallet,
       creatorName: creatorName || "Creator",
       creatorAvatar: `https://api.dicebear.com/7.x/identicon/svg?seed=${creatorWallet}`,
+      creatorId: creatorId || null,
       fundingType: fundingType || "ALL_OR_NOTHING",
       milestoneCount: milestones ? milestones.length : 0,
       featured: false,

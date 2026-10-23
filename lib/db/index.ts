@@ -20,6 +20,7 @@ export interface RealCampaign {
   creatorWallet: string;
   creatorName: string;
   creatorAvatar: string;
+  creatorId?: string | null;
   status: "ACTIVE" | "SUCCEEDED" | "FAILED" | "CANCELLED";
   fundingType: "ALL_OR_NOTHING" | "FLEXIBLE";
   milestoneCount: number;
@@ -86,7 +87,8 @@ class RealDatabaseRepository {
   }
 
   async getCampaigns(filters?: { category?: string; status?: string; search?: string }): Promise<RealCampaign[]> {
-    if (this.isDbAvailable() && db) {
+    const activeDb = getDb();
+    if (this.isDbAvailable() && activeDb) {
       try {
         const conditions = [];
         if (filters?.category && filters.category !== "All") {
@@ -99,12 +101,12 @@ class RealDatabaseRepository {
           conditions.push(ilike(schema.campaigns.title, `%${filters.search}%`));
         }
 
-        const query = db.select().from(schema.campaigns);
+        const query = activeDb.select().from(schema.campaigns);
         const rows = conditions.length > 0
           ? await query.where(and(...conditions)).orderBy(desc(schema.campaigns.createdAt))
           : await query.orderBy(desc(schema.campaigns.createdAt));
 
-        return rows.map((r) => ({
+        return rows.map((r: any) => ({
           id: r.id,
           onChainId: r.onChainId,
           title: r.title,
@@ -119,6 +121,7 @@ class RealDatabaseRepository {
           creatorWallet: r.creatorWallet,
           creatorName: r.creatorName || "Creator",
           creatorAvatar: r.creatorAvatar || "",
+          creatorId: r.creatorId || null,
           status: r.status as RealCampaign["status"],
           fundingType: r.fundingType as RealCampaign["fundingType"],
           milestoneCount: r.milestoneCount,
@@ -147,9 +150,10 @@ class RealDatabaseRepository {
   }
 
   async getCampaignById(id: string) {
-    if (this.isDbAvailable() && db) {
+    const activeDb = getDb();
+    if (this.isDbAvailable() && activeDb) {
       try {
-        const rows = await db
+        const rows = await activeDb
           .select()
           .from(schema.campaigns)
           .where(eq(schema.campaigns.id, id))
@@ -157,24 +161,24 @@ class RealDatabaseRepository {
 
         if (rows.length > 0) {
           const r = rows[0];
-          const dbMilestones = await db
+          const dbMilestones = await activeDb
             .select()
             .from(schema.milestones)
             .where(eq(schema.milestones.campaignId, id));
 
-          const dbContributions = await db
+          const dbContributions = await activeDb
             .select()
             .from(schema.contributions)
             .where(eq(schema.contributions.campaignId, id))
             .orderBy(desc(schema.contributions.createdAt));
 
-          const dbUpdates = await db
+          const dbUpdates = await activeDb
             .select()
             .from(schema.campaignUpdates)
             .where(eq(schema.campaignUpdates.campaignId, id))
             .orderBy(desc(schema.campaignUpdates.createdAt));
 
-          const dbComments = await db
+          const dbComments = await activeDb
             .select()
             .from(schema.comments)
             .where(eq(schema.comments.campaignId, id))
@@ -201,7 +205,7 @@ class RealDatabaseRepository {
             backersCount: r.backersCount,
             featured: Boolean(r.featured),
             createdAt: r.createdAt.toISOString(),
-            milestones: dbMilestones.map((m) => ({
+            milestones: dbMilestones.map((m: any) => ({
               id: m.id,
               campaignId: m.campaignId,
               index: m.index,
@@ -214,7 +218,7 @@ class RealDatabaseRepository {
               votesForEth: String(m.votesForEth || "0"),
               votesAgainstEth: String(m.votesAgainstEth || "0"),
             })),
-            contributions: dbContributions.map((c) => ({
+            contributions: dbContributions.map((c: any) => ({
               id: c.id,
               campaignId: c.campaignId,
               backerWallet: c.backerWallet,
@@ -225,7 +229,7 @@ class RealDatabaseRepository {
               message: c.message || undefined,
               createdAt: c.createdAt.toISOString(),
             })),
-            updates: dbUpdates.map((u) => ({
+            updates: dbUpdates.map((u: any) => ({
               id: u.id,
               campaignId: u.campaignId,
               title: u.title,
@@ -233,7 +237,7 @@ class RealDatabaseRepository {
               authorWallet: u.authorWallet,
               createdAt: u.createdAt.toISOString(),
             })),
-            comments: dbComments.map((cm) => ({
+            comments: dbComments.map((cm: any) => ({
               id: cm.id,
               campaignId: cm.campaignId,
               authorWallet: cm.authorWallet,
@@ -273,9 +277,10 @@ class RealDatabaseRepository {
       createdAt: new Date().toISOString(),
     };
 
-    if (this.isDbAvailable() && db) {
+    const activeDb = getDb();
+    if (this.isDbAvailable() && activeDb) {
       try {
-        await db.insert(schema.campaigns).values({
+        await activeDb.insert(schema.campaigns).values({
           id,
           onChainId: newCamp.onChainId,
           title: newCamp.title,
@@ -290,6 +295,7 @@ class RealDatabaseRepository {
           creatorWallet: newCamp.creatorWallet,
           creatorName: newCamp.creatorName,
           creatorAvatar: newCamp.creatorAvatar,
+          creatorId: (newCamp as any).creatorId || null,
           status: "ACTIVE",
           fundingType: newCamp.fundingType,
           milestoneCount: newCamp.milestones ? newCamp.milestones.length : 0,
@@ -299,7 +305,7 @@ class RealDatabaseRepository {
 
         if (newCamp.milestones) {
           for (const [idx, m] of newCamp.milestones.entries()) {
-            await db.insert(schema.milestones).values({
+            await activeDb.insert(schema.milestones).values({
               id: `ms-${id}-${idx}`,
               campaignId: id,
               index: idx,
@@ -479,18 +485,32 @@ class RealDatabaseRepository {
 // Global instance with zero dummy data
 export const repository = new RealDatabaseRepository();
 
-function createDbClient() {
+let _cachedDb: any = null;
+
+export function getDb() {
+  if (_cachedDb) return _cachedDb;
   const connectionString = process.env.DATABASE_URL;
   if (!connectionString || connectionString.trim() === "" || connectionString.includes("user:password@endpoint")) {
     return null;
   }
   try {
     const sql = neon(connectionString);
-    return drizzle(sql, { schema });
+    _cachedDb = drizzle(sql, { schema });
+    return _cachedDb;
   } catch (err) {
     console.warn("Neon connection error:", err);
     return null;
   }
 }
 
-export const db = createDbClient();
+export const db = new Proxy({} as any, {
+  get(_target, prop) {
+    const client = getDb();
+    if (!client) return undefined;
+    const value = (client as any)[prop];
+    if (typeof value === "function") {
+      return value.bind(client);
+    }
+    return value;
+  },
+});

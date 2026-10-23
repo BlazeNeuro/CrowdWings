@@ -1,15 +1,17 @@
 "use client";
 
 import Link from "next/link";
+import { useSession } from "@/lib/auth/auth-client";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ModeToggle } from "@/components/mode-toggle";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { Sparkles, Rocket } from "lucide-react";
+import { Sparkles, Rocket, UserCheck, LogIn } from "lucide-react";
 
 export function SiteHeader() {
+  const { data: session } = useSession();
   return (
     <header className="flex h-(--header-height) shrink-0 items-center justify-between border-b border-border bg-background px-4 lg:px-6">
       <div className="flex items-center gap-2">
@@ -40,6 +42,15 @@ export function SiteHeader() {
         </Link>
 
         <ModeToggle />
+
+        {!session && (
+          <Link href="/login">
+            <Button size="sm" variant="secondary" className="gap-1.5 text-xs">
+              <LogIn className="size-3.5" />
+              Sign In
+            </Button>
+          </Link>
+        )}
 
         {/* RainbowKit Connect Button */}
         <ConnectButton
